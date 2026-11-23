@@ -111,9 +111,45 @@ class TestRuleConversions(unittest.TestCase):
         self.assertEqual(skipped, 2)
 
 
+class TestCustomRules(unittest.TestCase):
+    def test_load_custom_rules_normalizes_and_deduplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "custom-rules.list"
+            path.write_text(
+                """
+                # Custom rules comment
+                DOMAIN-SUFFIX,Antigravity.Google,🤖 AI 平台
+                - DOMAIN,cloudcode-pa.googleapis.com,🤖 AI 平台
+                DOMAIN-SUFFIX,antigravity.google,🤖 AI 平台
+                IP-CIDR,1.2.3.4/32,🚀 节点选择,no-resolve
+                DOMAIN,bypass.example.com,PASS
+                PROCESS-NAME,clash,DIRECT
+                INVALID-LINE
+                """,
+                encoding="utf-8",
+            )
+            rules, skipped = convert.load_custom_rules(path)
+            self.assertEqual(
+                rules,
+                [
+                    "DOMAIN-SUFFIX,antigravity.google,🤖 AI 平台",
+                    "DOMAIN,cloudcode-pa.googleapis.com,🤖 AI 平台",
+                    "IP-CIDR,1.2.3.4/32,🚀 节点选择,no-resolve",
+                    "DOMAIN,bypass.example.com,DIRECT",
+                ],
+            )
+            self.assertEqual(skipped, 2)
+
+    def test_missing_custom_rules_file_returns_empty(self) -> None:
+        rules, skipped = convert.load_custom_rules(Path("/nonexistent/custom-rules.list"))
+        self.assertEqual(rules, [])
+        self.assertEqual(skipped, 0)
+
+
 class TestProxyGroupsAndEndToEnd(unittest.TestCase):
     def test_end_to_end_real_config_yaml(self) -> None:
         config_path = PROJECT_ROOT / "config" / "config.yaml"
+        custom_rules_path = PROJECT_ROOT / "config" / "custom-rules.list"
         general_path = PROJECT_ROOT / "templates" / "general.ini"
         cfg = convert.load_yaml_file(config_path)
 
@@ -140,6 +176,8 @@ class TestProxyGroupsAndEndToEnd(unittest.TestCase):
                 [
                     "--config",
                     str(config_path),
+                    "--custom-rules",
+                    str(custom_rules_path),
                     "--general",
                     str(general_path),
                     "--output-dir",
@@ -189,6 +227,12 @@ class TestProxyGroupsAndEndToEnd(unittest.TestCase):
                 "🇭🇰 香港节点 = url-test, policy-regex-filter=(?i)(🇭🇰|港|hk|hongkong|hong kong), url=http://www.gstatic.com/generate_204, interval=600, timeout=5, tolerance=50",
                 raw_conf,
             )
+            # Custom rules must appear at the top of [Rule] before RULE-SETs
+            self.assertIn("DOMAIN-SUFFIX,antigravity.google,🤖 AI 平台", raw_conf)
+            self.assertLess(
+                raw_conf.index("DOMAIN-SUFFIX,antigravity.google,🤖 AI 平台"),
+                raw_conf.index("RULE-SET,https://raw.githubusercontent.com/demo/my-rules/main/dist/rules/private.list"),
+            )
             # Rule-sets and FINAL rule
             self.assertIn(
                 "RULE-SET,https://raw.githubusercontent.com/demo/my-rules/main/dist/rules/ads.list,🛑 广告域名",
@@ -217,6 +261,7 @@ class TestProxyGroupsAndEndToEnd(unittest.TestCase):
             # Verify summary report
             summary_text = summary_file.read_text(encoding="utf-8")
             self.assertIn("## Clash -> Shadowrocket Sync Summary", summary_text)
+            self.assertIn("| `custom-rules` |", summary_text)
             self.assertIn("| `ads` |", summary_text)
 
 

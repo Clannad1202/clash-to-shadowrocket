@@ -21,7 +21,8 @@
 ```text
 .
 ├── config/
-│   └── config.yaml                # 你的原始 Clash / ShellCrash 配置文件（不含任何节点隐私）
+│   ├── config.yaml                # 你的原始 Clash / ShellCrash 配置文件（不含任何节点隐私）
+│   └── custom-rules.list          # 独立维护的自定义规则（自动置顶，优先级最高）
 ├── templates/
 │   └── general.ini                # Shadowrocket [General] 基础参数模板（可按需修改）
 ├── scripts/
@@ -102,6 +103,7 @@ python3 scripts/convert.py \
 
 ## 自定义配置
 
-- **修改分流规则或策略组**：直接编辑 `config/config.yaml` 并推送到 `main`，GitHub Actions 会自动重新转换并更新 `dist/`。
+- **增删自定义分流规则**：直接编辑 `config/custom-rules.list`（每行一条 `规则类型,匹配值,策略名[,no-resolve]`，自动插入 `[Rule]` 最顶部，优先级最高）并推送到 `main`，GitHub Actions 会自动重新生成 `dist/`。
+- **修改策略组或规则集**：编辑 `config/config.yaml` 并推送到 `main`。
 - **修改 Shadowrocket `[General]` 参数**（如开启 `ipv6 = true` 或修改 `dns-server`）：编辑 `templates/general.ini` 并推送即可。
 - **自定义托管域名**（例如使用 GitHub Pages 或自建反代）：可在仓库 **Settings → Secrets and variables → Actions → Variables** 中设置 `RAW_BASE_URL` 或 `CDN_BASE_URL`。

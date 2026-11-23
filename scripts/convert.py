@@ -513,15 +513,54 @@ def apply_policy_to_rule(rule_line: str, policy: str, force_no_resolve: bool = F
     return f'{rtype},{value},{policy}'
 
 
+def load_custom_rules(path: Path | None) -> tuple[list[str], int]:
+    """Load and normalize standalone custom Shadowrocket/Clash rules from a .list file."""
+    if path is None or not path.exists():
+        return [], 0
+
+    raw_entries = extract_raw_entries(path.read_text(encoding='utf-8'))
+    seen: set[str] = set()
+    rules: list[str] = []
+    skipped = 0
+
+    for entry in raw_entries:
+        parts = [p.strip() for p in entry.split(',')]
+        if len(parts) < 3:
+            skipped += 1
+            continue
+        rtype = CLASSICAL_TYPE_ALIAS.get(parts[0].upper(), parts[0].upper())
+        if rtype not in SUPPORTED_CLASSICAL_TYPES:
+            skipped += 1
+            continue
+        value = parts[1]
+        policy = map_policy(parts[2])
+        has_no_resolve = any(p.lower() == 'no-resolve' for p in parts[3:])
+        base_rule = convert_classical_entry(f'{rtype},{value}', force_no_resolve=has_no_resolve)
+        if not base_rule:
+            skipped += 1
+            continue
+        full_rule = apply_policy_to_rule(base_rule, policy, force_no_resolve=has_no_resolve)
+        if full_rule not in seen:
+            seen.add(full_rule)
+            rules.append(full_rule)
+
+    return rules, skipped
+
+
 def convert_rules(
     clash_rules: list[str],
     providers: dict[str, ProviderResult],
     rules_base_url: str | None,
     inline: bool = False,
+    custom_rules: list[str] | None = None,
 ) -> tuple[list[str], int]:
     """Convert Clash rules list to Shadowrocket [Rule] lines."""
     output: list[str] = []
     skipped = 0
+
+    if custom_rules:
+        output.append(f'# --- Custom Rules ({len(custom_rules)} rules) ---')
+        output.extend(custom_rules)
 
     for raw in clash_rules:
         line = str(raw).strip()
@@ -606,15 +645,25 @@ def render_rule_list(prov: ProviderResult) -> str:
     return '\n'.join(header) + '\n' + '\n'.join(prov.rules) + '\n'
 
 
-def write_summary(summary_path: Path, providers: dict[str, ProviderResult], generated_files: list[str]) -> None:
+def write_summary(
+    summary_path: Path,
+    providers: dict[str, ProviderResult],
+    generated_files: list[str],
+    custom_rule_count: int = 0,
+    custom_skipped: int = 0,
+) -> None:
     lines = [
         '## Clash -> Shadowrocket Sync Summary',
         '',
         '| Rule-Set | Behavior | Rules | Skipped | Source |',
         '| --- | --- | ---: | ---: | --- |',
     ]
-    total_rules = 0
-    total_skipped = 0
+    total_rules = custom_rule_count
+    total_skipped = custom_skipped
+    if custom_rule_count or custom_skipped:
+        lines.append(
+            f'| `custom-rules` | `classical` | {custom_rule_count:,} | {custom_skipped:,} | `config/custom-rules.list` |'
+        )
     for prov in providers.values():
         total_rules += len(prov.rules)
         total_skipped += prov.skipped
@@ -634,6 +683,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Convert Clash / Mihomo YAML to Shadowrocket configs')
     parser.add_argument(
         '--config', type=Path, default=Path('config/config.yaml'), help='Path to Clash config.yaml'
+    )
+    parser.add_argument(
+        '--custom-rules',
+        type=Path,
+        default=Path('config/custom-rules.list'),
+        help='Optional path to standalone custom rules file (prepended with highest priority)',
     )
     parser.add_argument(
         '--general', type=Path, default=Path('templates/general.ini'), help='Path to Shadowrocket [General] template'
@@ -678,6 +733,9 @@ def main(argv: list[str] | None = None) -> int:
 
     config = load_yaml_file(args.config)
     general_text = args.general.read_text(encoding='utf-8')
+    custom_rules, custom_skipped = load_custom_rules(args.custom_rules)
+    if custom_rules or custom_skipped:
+        print(f'[OK] {"custom-rules":14s} ({"classical":9s}): {len(custom_rules):6d} rules (skipped {custom_skipped}) <- {args.custom_rules}')
 
     proxy_groups = config.get('proxy-groups') or []
     rule_providers_cfg: dict[str, dict[str, Any]] = config.get('rule-providers') or {}
@@ -753,7 +811,11 @@ def main(argv: list[str] | None = None) -> int:
 
     # 1. Modular GitHub Raw config
     raw_rules, raw_skipped = convert_rules(
-        clash_rules, provider_results, rules_base_url=f'{raw_dist_base}/rules', inline=False
+        clash_rules,
+        provider_results,
+        rules_base_url=f'{raw_dist_base}/rules',
+        inline=False,
+        custom_rules=custom_rules,
     )
     raw_conf_path = out_dir / 'shadowrocket.conf'
     raw_conf_path.write_text(
@@ -769,7 +831,13 @@ def main(argv: list[str] | None = None) -> int:
     generated_files.append(str(raw_conf_path))
 
     # 2. Modular jsDelivr CDN config
-    cdn_rules, _ = convert_rules(clash_rules, provider_results, rules_base_url=f'{cdn_dist_base}/rules', inline=False)
+    cdn_rules, _ = convert_rules(
+        clash_rules,
+        provider_results,
+        rules_base_url=f'{cdn_dist_base}/rules',
+        inline=False,
+        custom_rules=custom_rules,
+    )
     cdn_conf_path = out_dir / 'shadowrocket-cdn.conf'
     cdn_conf_path.write_text(
         render_conf(
@@ -785,7 +853,13 @@ def main(argv: list[str] | None = None) -> int:
 
     # 3. Single-file inline config
     if not args.no_inline:
-        inline_rules, _ = convert_rules(clash_rules, provider_results, rules_base_url=None, inline=True)
+        inline_rules, _ = convert_rules(
+            clash_rules,
+            provider_results,
+            rules_base_url=None,
+            inline=True,
+            custom_rules=custom_rules,
+        )
         inline_conf_path = out_dir / 'shadowrocket-inline.conf'
         inline_conf_path.write_text(
             render_conf(
@@ -800,12 +874,18 @@ def main(argv: list[str] | None = None) -> int:
         generated_files.append(str(inline_conf_path))
 
     if args.summary_file:
-        write_summary(args.summary_file, provider_results, generated_files)
+        write_summary(
+            args.summary_file,
+            provider_results,
+            generated_files,
+            custom_rule_count=len(custom_rules),
+            custom_skipped=custom_skipped,
+        )
 
     print(
-        f'\nDone! Converted {len(provider_results)} rule-sets '
-        f'({sum(len(p.rules) for p in provider_results.values()):,} total rules, '
-        f'{raw_skipped} unsupported top-level rules skipped).'
+        f'\nDone! Converted {len(provider_results)} rule-sets + {len(custom_rules)} custom rules '
+        f'({sum(len(p.rules) for p in provider_results.values()) + len(custom_rules):,} total rules, '
+        f'{raw_skipped + custom_skipped} unsupported top-level rules skipped).'
     )
     return 0
 

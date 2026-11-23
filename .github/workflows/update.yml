@@ -10,6 +10,7 @@ on:
       - main
     paths:
       - "config/config.yaml"
+      - "config/custom-rules.list"
       - "templates/general.ini"
       - "scripts/convert.py"
       - ".github/workflows/update.yml"
@@ -49,6 +50,7 @@ jobs:
         run: |
           python3 scripts/convert.py \
             --config config/config.yaml \
+            --custom-rules config/custom-rules.list \
             --general templates/general.ini \
             --output-dir dist \
             --repo "${{ github.repository }}" \

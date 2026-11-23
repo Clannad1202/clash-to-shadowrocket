@@ -1,0 +1,13 @@
+# 自定义分流规则（优先级最高，会自动插入 Shadowrocket [Rule] 顶部）
+# 格式：规则类型,匹配值,策略名[,no-resolve]
+# 支持规则类型：DOMAIN / DOMAIN-SUFFIX / DOMAIN-KEYWORD / IP-CIDR / IP-CIDR6 / GEOIP / DST-PORT / SRC-IP / URL-REGEX / USER-AGENT / PROTOCOL / IP-ASN
+
+# --- Google Antigravity & Gemini 补充 ---
+DOMAIN-SUFFIX,antigravity.google,🤖 AI 平台
+DOMAIN-SUFFIX,antigravity-pa.googleapis.com,🤖 AI 平台
+DOMAIN,cloudcode-pa.googleapis.com,🤖 AI 平台
+DOMAIN,daily-cloudcode-pa.googleapis.com,🤖 AI 平台
+DOMAIN,autopush-cloudcode-pa.googleapis.com,🤖 AI 平台
+DOMAIN-SUFFIX,robinfrontend-pa.googleapis.com,🤖 AI 平台
+DOMAIN-SUFFIX,jules.google.com,🤖 AI 平台
+DOMAIN-SUFFIX,labs.google,🤖 AI 平台
