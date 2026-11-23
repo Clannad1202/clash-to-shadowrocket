@@ -216,7 +216,7 @@ class TestProxyGroupsAndEndToEnd(unittest.TestCase):
 
             # Verify summary report
             summary_text = summary_file.read_text(encoding="utf-8")
-            self.assertIn("## ShellCrash -> Shadowrocket Sync Summary", summary_text)
+            self.assertIn("## Clash -> Shadowrocket Sync Summary", summary_text)
             self.assertIn("| `ads` |", summary_text)
 
 

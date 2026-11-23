@@ -1,11 +1,11 @@
-# ShellCrash to Shadowrocket 自动转换与托管
+# Clash to Shadowrocket 自动转换与托管
 
-将 ShellCrash / Mihomo（Clash）配置自动转换为 **Shadowrocket（小火箭）** 可直接识别和订阅的托管配置文件与规则集，并通过 **GitHub Actions** 每天自动同步上游规则并更新。
+将 Clash / Mihomo（含 ShellCrash）配置自动转换为 **Shadowrocket（小火箭）** 可直接识别和订阅的托管配置文件与规则集，并通过 **GitHub Actions** 每天自动同步上游规则并更新。
 
 ## 解决的核心问题
 
 1. **Mihomo / Clash 规则集不兼容 Shadowrocket**：
-   - ShellCrash 配置中的 `rule-providers` 使用了 Mihomo 二进制 `.mrs` 格式（以及 Clash 的 `+.example.com`、裸 IP CIDR、YAML `payload:` 等语法），Shadowrocket 无法直接识别匹配。
+   - Clash / Mihomo 配置中的 `rule-providers` 使用了 Mihomo 二进制 `.mrs` 格式（以及 Clash 的 `+.example.com`、裸 IP CIDR、YAML `payload:` 等语法），Shadowrocket 无法直接识别匹配。
    - 本项目脚本会自动拉取上游规则集对应的文本源（支持 `.mrs` 自动映射回退到 `.list` / `.yaml` / `.txt` 与 GitHub 镜像），按 `behavior`（`domain` / `ipcidr` / `classical`）逐条转换为标准的 Shadowrocket 规则语法（`DOMAIN`、`DOMAIN-SUFFIX`、`IP-CIDR`、`IP-CIDR6` 等），并去重清洗无效条目。
 2. **策略组与关键字兼容适配**：
    - 完整保留 `config/config.yaml` 中的所有 35 个分流与地区测速策略组（含 `policy-regex-filter` 正则筛选、`url-test` 延迟容差与 `hidden=1` 隐藏组）。
@@ -21,7 +21,7 @@
 ```text
 .
 ├── config/
-│   └── config.yaml                # 你的原始 ShellCrash 配置文件（不含任何节点隐私）
+│   └── config.yaml                # 你的原始 Clash / ShellCrash 配置文件（不含任何节点隐私）
 ├── templates/
 │   └── general.ini                # Shadowrocket [General] 基础参数模板（可按需修改）
 ├── scripts/
