@@ -1,0 +1,68 @@
+name: Update Shadowrocket Rules & Config
+
+on:
+  schedule:
+    # Run daily at 04:30 Beijing Time (20:30 UTC), shortly after DustinWin/ruleset_geodata updates (~03:00 CST)
+    - cron: "30 20 * * *"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "config/config.yaml"
+      - "templates/general.ini"
+      - "scripts/convert.py"
+      - ".github/workflows/update.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-shadowrocket-rules
+  cancel-in-progress: false
+
+jobs:
+  build-and-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Convert ShellCrash config to Shadowrocket
+        env:
+          RAW_BASE_URL: ${{ vars.RAW_BASE_URL }}
+          CDN_BASE_URL: ${{ vars.CDN_BASE_URL }}
+        run: |
+          python3 scripts/convert.py \
+            --config config/config.yaml \
+            --general templates/general.ini \
+            --output-dir dist \
+            --repo "${{ github.repository }}" \
+            --branch "${{ github.ref_name }}" \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit and push updated dist files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/
+          if git diff --cached --quiet; then
+            echo "No changes in dist/, skipping commit."
+          else
+            git commit -m "chore(rules): update Shadowrocket rules and configs ($(date -u +'%Y-%m-%d %H:%M UTC'))"
+            git push
+          fi
