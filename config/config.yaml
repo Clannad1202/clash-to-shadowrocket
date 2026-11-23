@@ -198,8 +198,16 @@ rules:
   - RULE-SET,games,🕹️ 游戏平台
   - RULE-SET,netflix,🎥 奈飞视频
   - RULE-SET,youtube,📹 油管视频
-  - RULE-SET,media,🌍 国外媒体
+  - DOMAIN-SUFFIX,antigravity.google,🤖 AI 平台
+  - DOMAIN-SUFFIX,antigravity-pa.googleapis.com,🤖 AI 平台
+  - DOMAIN,cloudcode-pa.googleapis.com,🤖 AI 平台
+  - DOMAIN,daily-cloudcode-pa.googleapis.com,🤖 AI 平台
+  - DOMAIN,autopush-cloudcode-pa.googleapis.com,🤖 AI 平台
+  - DOMAIN-SUFFIX,robinfrontend-pa.googleapis.com,🤖 AI 平台
+  - DOMAIN-SUFFIX,jules.google.com,🤖 AI 平台
+  - DOMAIN-SUFFIX,labs.google,🤖 AI 平台
   - RULE-SET,ai,🤖 AI 平台
+  - RULE-SET,media,🌍 国外媒体
   - RULE-SET,networktest,📈 网络测试
   - RULE-SET,proxy,🌎 国外域名
   - RULE-SET,cn,🇨🇳 国内域名
